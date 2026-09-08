@@ -22,7 +22,7 @@ function AppNavbar() {
           >
             {/* decorative: the wordmark beside it already names the app */}
             <FcVoicePresentation size={32} aria-hidden="true" />
-            Social Media App v2
+            LinkedIn Clone
           </Navbar.Brand>
           {currentUser?.isAdmin && <RestoreSite />}
           {token && (
