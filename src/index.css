@@ -1,0 +1,153 @@
+/* LinkedIn theme layer.
+
+   Loaded after bootstrap.min.css in main.jsx, so these win on source order at
+   plain specificity - no !important needed anywhere below.
+
+   Bootstrap 5.3 exposes most of its look through CSS variables, so this themes
+   the framework itself rather than restyling each component. The exception is
+   the .btn-* colour classes, which compile their palette to literal hex rather
+   than reading --bs-primary, so those get overridden by hand further down. */
+
+:root {
+  --li-blue: #0a66c2;
+  --li-blue-hover: #004182;
+  --li-blue-active: #09437d;
+  --li-blue-rgb: 10, 102, 194;
+  /* the warm grey the feed sits on - the single most recognisable part of the
+     look, and what makes the white cards read as cards */
+  --li-surface: #f4f2ee;
+  --li-border: rgba(0, 0, 0, 0.08);
+  --li-text: rgba(0, 0, 0, 0.9);
+  --li-text-muted: rgba(0, 0, 0, 0.6);
+
+  /* linkedin.com ships no webfont for its UI - its Art Deco design system
+     renders in the platform's native font (SF on Apple, Segoe UI on Windows,
+     Roboto on Android). Overriding Bootstrap's variable rather than `body` so
+     form controls and buttons, which don't inherit font from body, pick it up
+     too. */
+  --bs-font-sans-serif: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", "Fira Sans", Ubuntu, Oxygen, "Oxygen Sans", Cantarell,
+    "Droid Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Lucida Grande", Helvetica, Arial, sans-serif;
+
+  /* linkedin's base is 14px against bootstrap's 16px, which is most of why the
+     stock theme reads as roomier than the real feed */
+  --bs-body-font-size: 0.875rem;
+  --bs-body-color: var(--li-text);
+  --bs-secondary-color: var(--li-text-muted); /* .text-muted */
+  --bs-border-color: var(--li-border);
+  --bs-border-radius: 0.5rem; /* linkedin's cards are 8px */
+
+  --bs-primary: var(--li-blue);
+  --bs-primary-rgb: var(--li-blue-rgb); /* .border-primary, ringing own posts */
+  --bs-link-color: var(--li-blue);
+  --bs-link-color-rgb: var(--li-blue-rgb);
+  --bs-link-hover-color: var(--li-blue-hover);
+  --bs-link-hover-color-rgb: var(--li-blue-rgb);
+}
+
+/* NOTE: deliberately NOT --bs-body-bg. Bootstrap derives --bs-card-bg,
+   --bs-list-group-bg and .form-control's background from it, so setting the
+   warm grey there turns cards and inputs beige too - the inverse of the real
+   site, which is white cards on grey. Setting it on body leaves that chain
+   pointing at white. */
+body {
+  background-color: var(--li-surface);
+}
+
+/* linkedin underlines links on hover only; bootstrap 5.3 underlines always */
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600; /* bootstrap ships 500; linkedin's headings are semibold */
+}
+
+/* --- buttons -------------------------------------------------------------
+   Pill-shaped and semibold is the most identifiable part of the UI. This rule
+   sits after bootstrap's .btn-sm, so it also wins for size="sm" buttons, which
+   would otherwise keep the small square radius. */
+.btn {
+  --bs-btn-border-radius: 1.5rem;
+  --bs-btn-font-weight: 600;
+  --bs-btn-font-size: 0.875rem;
+  --bs-btn-padding-x: 1rem;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--li-blue);
+  --bs-btn-border-color: var(--li-blue);
+  --bs-btn-hover-bg: var(--li-blue-hover);
+  --bs-btn-hover-border-color: var(--li-blue-hover);
+  --bs-btn-active-bg: var(--li-blue-active);
+  --bs-btn-active-border-color: var(--li-blue-active);
+  --bs-btn-disabled-bg: var(--li-blue);
+  --bs-btn-disabled-border-color: var(--li-blue);
+  --bs-btn-focus-shadow-rgb: var(--li-blue-rgb);
+}
+
+/* linkedin's secondary button tints on hover rather than filling solid */
+.btn-outline-primary {
+  --bs-btn-color: var(--li-blue);
+  --bs-btn-border-color: var(--li-blue);
+  --bs-btn-hover-color: var(--li-blue-hover);
+  --bs-btn-hover-bg: rgba(var(--li-blue-rgb), 0.1);
+  --bs-btn-hover-border-color: var(--li-blue-hover);
+  --bs-btn-active-color: var(--li-blue-hover);
+  --bs-btn-active-bg: rgba(var(--li-blue-rgb), 0.15);
+  --bs-btn-active-border-color: var(--li-blue-hover);
+  --bs-btn-disabled-color: var(--li-blue);
+  --bs-btn-disabled-border-color: var(--li-blue);
+  --bs-btn-focus-shadow-rgb: var(--li-blue-rgb);
+}
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--li-text-muted);
+  --bs-btn-border-color: var(--li-text-muted);
+  --bs-btn-hover-color: var(--li-text);
+  --bs-btn-hover-bg: rgba(0, 0, 0, 0.08);
+  --bs-btn-hover-border-color: var(--li-text);
+  --bs-btn-active-color: var(--li-text);
+  --bs-btn-active-bg: rgba(0, 0, 0, 0.12);
+  --bs-btn-active-border-color: var(--li-text);
+  --bs-btn-focus-shadow-rgb: 0, 0, 0;
+}
+
+/* --- surfaces ----------------------------------------------------------- */
+.card {
+  --bs-card-border-color: var(--li-border);
+  --bs-card-spacer-y: 0.75rem;
+}
+
+.list-group {
+  --bs-list-group-border-color: var(--li-border);
+}
+
+.navbar {
+  border-bottom: 1px solid var(--li-border);
+}
+
+/* --- form controls -------------------------------------------------------
+   Inputs keep a tighter 4px radius than the 8px cards, as on the real site.
+   .form-control reads border-radius straight from --bs-border-radius, so
+   rescoping the variable here is enough. Its font-size is a hardcoded 1rem,
+   which needs setting outright to track the 14px base. */
+.form-control {
+  --bs-border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.form-control:focus {
+  border-color: var(--li-blue);
+  box-shadow: 0 0 0 0.2rem rgba(var(--li-blue-rgb), 0.2);
+}

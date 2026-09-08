@@ -6,10 +6,11 @@
   margin-bottom: 1rem;
 }
 
-/* three times the "Feed" button's natural width at size="lg" (76.5px); shared
-   so every navbar action matches it rather than sizing to its own label */
+/* shared so every navbar action matches rather than sizing to its own label.
+   linkedin's nav actions are compact, so this is sized to hold the longest
+   label ("Create Post") with padding to spare rather than to a fixed multiple */
 .navbar-action-button {
-  min-width: 230px;
+  min-width: 8.5rem;
 }
 
 /* the small round picture beside a post or comment author's name; flex-shrink
