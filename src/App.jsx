@@ -4,6 +4,7 @@ import AppNavbar from "./components/AppNavbar";
 import Feed from "./pages/Feed";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 
@@ -31,6 +32,10 @@ function App() {
         <Route
           path="/feed"
           element={token ? <Feed /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/profile"
+          element={token ? <Profile /> : <Navigate to="/login" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

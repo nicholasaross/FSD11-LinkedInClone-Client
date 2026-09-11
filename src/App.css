@@ -22,3 +22,30 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* the picture at the top of the profile card: it fills the card's width and is
+   cropped to a steady shape, so a tall portrait can't push the details below
+   the fold and a wide one still reaches both edges */
+.profile-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+/* the profile's captions: small and muted above the value they name, so the
+   details read as a record rather than as a form somebody could type into */
+.profile-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+/* a biography keeps the line breaks it was written with, and an image url has
+   no spaces to break at, so both are allowed to wrap mid-word rather than
+   pushing the card wider */
+.profile-field-multiline {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

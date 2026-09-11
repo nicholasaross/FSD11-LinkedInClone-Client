@@ -39,6 +39,14 @@ function AppNavbar() {
               >
                 Feed
               </Button>
+              <Button
+                as={Link}
+                to="/profile"
+                variant="primary"
+                className="navbar-action-button"
+              >
+                Profile
+              </Button>
               <CreatePost />
             </>
           )}
