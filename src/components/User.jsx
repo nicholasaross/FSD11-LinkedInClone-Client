@@ -1,40 +1,21 @@
-import { useState } from "react";
-import Badge from "react-bootstrap/Badge";
 import Button from "react-bootstrap/Button";
 import Card from "react-bootstrap/Card";
-import { CiCircleCheck, CiCirclePlus, CiCircleRemove } from "react-icons/ci";
 import { Link } from "react-router";
+import ConnectionActions, { ConnectionBadge } from "./ConnectionActions";
 import DeleteUser from "./DeleteUser";
 import EditUser from "./EditUser";
-import { DEFAULT_AVATAR } from "../utils/avatar";
-
-// the four states a card can be in, as the badge shows them. there is no
-// record at all until somebody asks, so "none" is what most cards are
-const BADGES = {
-  accepted: { bg: "success", label: "Connected" },
-  incoming: { bg: "info", text: "dark", label: "Wants to connect" },
-  outgoing: { bg: "secondary", label: "Request sent" },
-  none: { bg: "light", text: "secondary", label: "Not connected" },
-};
-
-// where the signed-in user stands with the person on the card. a pending
-// request reads differently at each end: the person asked can answer it, the
-// person who asked can only wait
-function connectionStatus(connection, currentUserId) {
-  if (!connection) {
-    return "none";
-  }
-  if (connection.status === "accepted") {
-    return "accepted";
-  }
-  return connection.recipient?._id === currentUserId ? "incoming" : "outgoing";
-}
+import { avatarSrc } from "../utils/avatar";
+import {
+  hasConnectionActions,
+  isOwnAccount as isSelf,
+} from "../utils/connections";
 
 function User({
   user,
   currentUserId,
   isAdmin,
   connection,
+  compact = false,
   onEdit,
   onDelete,
   onConnect,
@@ -42,11 +23,7 @@ function User({
   onReject,
   onImageError,
 }) {
-  // the page owns the request and the connection list; this only keeps the
-  // buttons quiet while one is in flight
-  const [busy, setBusy] = useState(false);
-
-  const isOwnAccount = Boolean(currentUserId) && user._id === currentUserId;
+  const isOwnAccount = isSelf(user, currentUserId);
   // requireSelfOrAdmin: you may PUT your own account, and an admin may PUT
   // anyone's. the server updates only the fields the body carries, so a
   // password and admin rights survive an edit made from this form
@@ -55,46 +32,105 @@ function User({
   // deleting yourself would pull the account out from under the session
   const canDelete = Boolean(isAdmin) && !isOwnAccount;
 
-  const status = connectionStatus(connection, currentUserId);
-  const badge = BADGES[status];
-  // your own card has no connection to act on, and neither do the two states
-  // that are simply waiting: an accepted connection, and a request you sent
-  const showConnectionActions =
-    !isOwnAccount && (status === "none" || status === "incoming");
+  // your own card leads back to your own page, which is the one that carries
+  // the requests column as well
+  const profilePath = isOwnAccount ? "/profile" : `/profile/${user._id}`;
 
-  const run = async (action) => {
-    setBusy(true);
-    try {
-      await action?.(user, connection);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const showConnectionActions = hasConnectionActions(
+    user,
+    connection,
+    currentUserId,
+  );
+
+  // the same two answers whichever shape the card is, only sized to fit it
+  const connectionButtons = (size) => (
+    <ConnectionActions
+      user={user}
+      connection={connection}
+      currentUserId={currentUserId}
+      size={size}
+      onConnect={onConnect}
+      onAccept={onAccept}
+      onReject={onReject}
+    />
+  );
+
+  // a row rather than a card: down the side of somebody's profile there may be
+  // a dozen of these, and a list of faces and names is the point of that column
+  if (compact) {
+    return (
+      <Card className="mb-2">
+        <Card.Body className="d-flex align-items-center gap-3 p-2 text-start">
+          <Link to={profilePath} className="flex-shrink-0">
+            <img
+              className="user-avatar-sm"
+              src={avatarSrc(user.imageUrl)}
+              alt={user.name}
+              onError={(event) => onImageError?.(event, user)}
+            />
+          </Link>
+          {/* the middle column is the one that gives way when the row is
+              narrow, so a long name ellipses rather than shunting the button */}
+          <div className="flex-grow-1 min-width-0">
+            <Link
+              to={profilePath}
+              className="text-reset text-decoration-none fw-semibold d-block text-truncate"
+            >
+              {user.name}
+            </Link>
+            <div className="text-muted small text-truncate">
+              {user.username}
+            </div>
+          </div>
+          {/* whichever the state calls for: something to do about the
+              connection, or the badge saying why there is nothing to do */}
+          <div className="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+            {showConnectionActions ? (
+              connectionButtons("sm")
+            ) : (
+              <ConnectionBadge
+                user={user}
+                connection={connection}
+                currentUserId={currentUserId}
+              />
+            )}
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  }
 
   return (
     <Card className="mb-3">
       <Card.Body>
-        <Card.Img
-          className="user-avatar d-block mx-auto"
-          src={user.imageUrl || DEFAULT_AVATAR}
-          alt={user.name}
-          onError={(event) => onImageError?.(event, user)}
+        {/* the picture and the name are the way into the person's own page,
+            which is where the details this card no longer carries now live.
+            the link has to be a block, or the anchor shrinks to the picture and
+            takes the mx-auto centring with it */}
+        <Link to={profilePath} className="d-block">
+          <Card.Img
+            className="user-avatar d-block mx-auto"
+            src={avatarSrc(user.imageUrl)}
+            alt={user.name}
+            onError={(event) => onImageError?.(event, user)}
+          />
+        </Link>
+        <Card.Title>
+          <Link to={profilePath} className="text-reset text-decoration-none">
+            {user.name}
+          </Link>
+        </Card.Title>
+        <ConnectionBadge
+          user={user}
+          connection={connection}
+          currentUserId={currentUserId}
+          className="mb-2"
         />
-        <Card.Title>{user.name}</Card.Title>
-        {/* your own card has nobody to be connected to */}
-        {!isOwnAccount && (
-          <Badge
-            bg={badge.bg}
-            text={badge.text}
-            className={`mb-2${badge.bg === "light" ? " border" : ""}`}
-          >
-            {badge.label}
-          </Badge>
-        )}
+        {/* the handle is all a card carries now: an address and a biography
+            are things you read about somebody on their own page, and only the
+            people they have accepted see the address at all */}
         <Card.Text as="div">
           <p>Username: {user.username}</p>
-          <p>Email: {user.email}</p>
-          {user.biography && <p>{user.biography}</p>}
         </Card.Text>
         {/* what you do about the connection is its own row, ruled off from
             the rest: those buttons answer the badge above them, where Feed and
@@ -103,41 +139,15 @@ function User({
             connection and a request you sent both leave this row empty */}
         {showConnectionActions && (
           <div className="d-flex justify-content-center flex-wrap gap-2 pb-3 mb-3 border-bottom">
-            {/* asking again is only on offer when no record stands between the
-                two of you, since the server answers a second request with a 409 */}
-            {status === "none" && (
-              <Button
-                variant="primary"
-                onClick={() => run(onConnect)}
-                disabled={busy}
-              >
-                <CiCirclePlus /> Connect
-              </Button>
-            )}
-            {/* only the person asked may answer, which the server enforces too */}
-            {status === "incoming" && (
-              <>
-                <Button
-                  variant="success"
-                  onClick={() => run(onAccept)}
-                  disabled={busy}
-                >
-                  <CiCircleCheck /> Accept
-                </Button>
-                {/* turning somebody down is the same shape of act as deleting
-                    them, so it wears the same outline */}
-                <Button
-                  variant="outline-danger"
-                  onClick={() => run(onReject)}
-                  disabled={busy}
-                >
-                  <CiCircleRemove /> Reject
-                </Button>
-              </>
-            )}
+            {connectionButtons()}
           </div>
         )}
         <div className="d-flex justify-content-center flex-wrap gap-2">
+          {/* the same place the picture and the name lead, spelled out for
+              anyone who doesn't think to click them */}
+          <Button as={Link} to={profilePath} variant="outline-primary">
+            Profile
+          </Button>
           {/* ?author= narrows the feed to this user, which is the only thing
               that reads the API's author filter */}
           <Button

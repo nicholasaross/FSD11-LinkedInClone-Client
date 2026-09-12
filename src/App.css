@@ -6,6 +6,23 @@
   margin-bottom: 1rem;
 }
 
+/* the picture on a compact person row: between the post byline's 28px and the
+   full card's 100px, big enough to recognise a face at a glance down a list */
+.user-avatar-sm {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* a flex item won't shrink below the width of its own content by default, so a
+   long name would push the row wider instead of ellipsing. bootstrap 5.3 has no
+   utility for this */
+.min-width-0 {
+  min-width: 0;
+}
+
 /* shared so every navbar action matches rather than sizing to its own label.
    linkedin's nav actions are compact, so this is sized to hold the longest
    label ("Create Post") with padding to spare rather than to a fixed multiple */
@@ -48,4 +65,22 @@
 .profile-field-multiline {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* a skill chip carries more text than a badge normally does, so it sits at
+   readable size rather than the badge default, and wraps as a block of chips */
+.skill-chip {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4em 0.7em;
+}
+
+/* the cross inside a chip is the chip's own scale, not the page's, and bootstrap
+   sizes .btn-close for a modal header */
+.skill-chip .btn-close {
+  --bs-btn-close-size: 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  padding: 0;
+  margin-left: 0.15rem;
 }

@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR, handleAvatarError } from "../utils/avatar";
+import { avatarSrc, handleAvatarError } from "../utils/avatar";
 
 // the small round picture beside a post or comment author's name. alt is empty
 // on purpose: the name sits right next to it, so the picture is decorative and
@@ -7,7 +7,7 @@ function Avatar({ src }) {
   return (
     <img
       className="author-avatar"
-      src={src || DEFAULT_AVATAR}
+      src={avatarSrc(src)}
       alt=""
       onError={handleAvatarError}
     />

@@ -4,6 +4,7 @@ import AppNavbar from "./components/AppNavbar";
 import Feed from "./pages/Feed";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import PersonProfile from "./pages/PersonProfile";
 import Profile from "./pages/Profile";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
@@ -36,6 +37,12 @@ function App() {
         <Route
           path="/profile"
           element={token ? <Profile /> : <Navigate to="/login" replace />}
+        />
+        {/* everybody else's page. it ranks above the catch-all below, and
+            bounces back to "/profile" when the id turns out to be your own */}
+        <Route
+          path="/profile/:id"
+          element={token ? <PersonProfile /> : <Navigate to="/login" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

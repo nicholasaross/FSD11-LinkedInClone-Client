@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Alert from "react-bootstrap/Alert";
-import Card from "react-bootstrap/Card";
 import Col from "react-bootstrap/Col";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import EditUser from "../components/EditUser";
+import ProfileSummary from "../components/ProfileSummary";
+import SkillsPanel from "../components/SkillsPanel";
 import User from "../components/User";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import { DEFAULT_AVATAR, handleAvatarError } from "../utils/avatar";
+import { handleAvatarError } from "../utils/avatar";
 import { otherEnd } from "../utils/connections";
 
 // the message the server sent, or the fallback every page here uses when the
@@ -16,21 +17,6 @@ import { otherEnd } from "../utils/connections";
 const readError = (requestError) =>
   requestError.response?.data?.message ??
   "Could not reach the server. Is it running?";
-
-// the details keep the edit dialog's caption-over-value shape and field order,
-// so the same values sit in the same places whether they're being read or
-// changed. they are plain text rather than readOnly inputs: a bordered box
-// invites a click and a cursor, and the Edit button is the only way in
-function Field({ label, value, multiline }) {
-  return (
-    <div className="mb-3">
-      <div className="profile-field-label">{label}</div>
-      <div className={multiline ? "profile-field-multiline" : undefined}>
-        {value || <span className="text-muted fst-italic">Not set</span>}
-      </div>
-    </div>
-  );
-}
 
 function Profile() {
   const { currentUser } = useAuth();
@@ -156,42 +142,14 @@ function Profile() {
           )}
         </Col>
         <Col md={4}>
+          {/* the same summary a connection's page shows of them, read about
+              yourself: your own address is always yours to see */}
           {user && (
-            <Card>
-              {/* the picture runs the full width of the card here rather than
-                  being the small circle the user cards carry, and is keyed by
-                  url so a changed picture starts a fresh load */}
-              <Card.Img
-                key={user.imageUrl || DEFAULT_AVATAR}
-                variant="top"
-                className="profile-image"
-                src={user.imageUrl || DEFAULT_AVATAR}
-                alt={user.name}
-                onError={handleAvatarError}
-              />
-              <Card.Header as="h2" className="h5 mb-0">
-                Profile
-              </Card.Header>
-              <Card.Body className="text-start">
-                <Field label="Name" value={user.name} />
-                <Field label="Username" value={user.username} />
-                <Field label="Email" value={user.email} />
-                <Field label="Biography" value={user.biography} multiline />
-                {/* the url can run long and has no spaces to break at, so the
-                    value wraps mid-word rather than stretching the column */}
-                <Field label="Image URL" value={user.imageUrl} multiline />
-                {user.createdAt && (
-                  <div className="text-muted small">
-                    Member since {new Date(user.createdAt).toLocaleDateString()}
-                  </div>
-                )}
-              </Card.Body>
-              {/* the dialog keeps its buttons in a footer under the fields, so
-                  this one does too */}
-              <Card.Footer className="d-flex justify-content-end">
-                <EditUser user={user} onUserUpdated={fetchMe} />
-              </Card.Footer>
-            </Card>
+            <ProfileSummary
+              user={user}
+              showEmail
+              footer={<EditUser user={user} onUserUpdated={fetchMe} />}
+            />
           )}
         </Col>
         <Col md={4}>
@@ -223,6 +181,11 @@ function Profile() {
           )}
         </Col>
       </Row>
+      {/* what you can do, and what the people you are connected to can do,
+          under the profile the three columns above are about */}
+      {user && (
+        <SkillsPanel user={user} connections={connections} onChanged={refresh} />
+      )}
     </Container>
   );
 }
