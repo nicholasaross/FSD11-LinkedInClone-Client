@@ -84,3 +84,32 @@
   padding: 0;
   margin-left: 0.15rem;
 }
+
+/* a company's mark down a work history: square where the headshots beside it
+   are round, and contained rather than cropped, since a logo cut to fill its
+   box stops being the logo */
+.role-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 0.375rem;
+  flex-shrink: 0;
+  background-color: var(--bs-tertiary-bg);
+}
+
+/* the stand-in when there is no logo to show: the company's initial, sized to
+   fill the same square so a history with some logos and some without still
+   reads down a single edge */
+.role-logo-initial {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+}
+
+/* the roles are ruled between rather than boxed each, so the rule belongs to
+   every row but the first */
+.role-row + .role-row {
+  border-top: 1px solid var(--bs-border-color);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}

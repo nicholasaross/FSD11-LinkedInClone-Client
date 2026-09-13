@@ -10,9 +10,11 @@ import ConnectionActions, {
 } from "../components/ConnectionActions";
 import EditUser from "../components/EditUser";
 import ProfileSummary from "../components/ProfileSummary";
+import RolesPanel from "../components/RolesPanel";
 import SkillsPanel from "../components/SkillsPanel";
 import User from "../components/User";
 import { useAuth } from "../context/AuthContext";
+import { useConnections } from "../context/ConnectionsContext";
 import api from "../api/axios";
 import { handleAvatarError } from "../utils/avatar";
 import { connectionFromUserState, otherEnd } from "../utils/connections";
@@ -32,11 +34,19 @@ function PersonProfile() {
   const { id } = useParams();
   const { currentUser } = useAuth();
 
+  // your own connections, from the one place that keeps them: that is how
+  // each card in their list knows where you stand with that person, since the
+  // list itself says nothing about you
+  const {
+    byUserId,
+    error: connectionError,
+    connect,
+    accept,
+    reject,
+  } = useConnections();
+
   const [user, setUser] = useState(null);
   const [connections, setConnections] = useState([]);
-  // your own, which is how each card in their list knows where you stand with
-  // that person: the list itself says nothing about you
-  const [myConnections, setMyConnections] = useState([]);
   const [error, setError] = useState(null);
   // tells "still loading" apart from "there is nobody here", which read the
   // same while user is null
@@ -56,17 +66,6 @@ function PersonProfile() {
     }
   }, [id]);
 
-  // pending as well as accepted, unfiltered: the cards read every state
-  const fetchMyConnections = useCallback(async () => {
-    try {
-      const response = await api.get("/connections");
-      return response.data.data ?? [];
-    } catch (requestError) {
-      console.error("Error fetching your connections:", requestError);
-      return [];
-    }
-  }, []);
-
   const refresh = useCallback(async () => {
     try {
       // one call answers most of the page: the server decorates the user with
@@ -74,26 +73,24 @@ function PersonProfile() {
       // behave and whether the address is on show
       const response = await api.get(`/users/${id}`);
       const fetched = response.data.data;
-      // the other two hang off this one's answer, so they all land together
+      // their list hangs off this one's answer, so the two land together
       // rather than the page redrawing twice
-      const [theirs, mine] =
+      const theirs =
         fetched.connectionStatus === "accepted"
-          ? await Promise.all([fetchTheirConnections(), fetchMyConnections()])
-          : [[], []];
+          ? await fetchTheirConnections()
+          : [];
 
       setUser(fetched);
       setConnections(theirs);
-      setMyConnections(mine);
       setError(null);
     } catch (requestError) {
       setUser(null);
       setConnections([]);
-      setMyConnections([]);
       setError(readError(requestError));
     } finally {
       setLoaded(true);
     }
-  }, [fetchMyConnections, fetchTheirConnections, id]);
+  }, [fetchTheirConnections, id]);
 
   // the await keeps setState out of the effect body, which the
   // react-hooks/set-state-in-effect rule flags as a cascading render
@@ -112,59 +109,34 @@ function PersonProfile() {
     [currentUser?._id, user],
   );
 
-  // a connection of yours names both people, so it is filed under whichever of
-  // them isn't you: that is the card in their list it belongs to. the same map
-  // the landing page builds, for the same reason
-  const myConnectionByUserId = useMemo(() => {
-    const map = new Map();
-    for (const item of myConnections) {
-      const otherId = otherEnd(item, currentUser?._id)?._id;
-      if (otherId) {
-        map.set(otherId, item);
-      }
-    }
-    return map;
-  }, [currentUser?._id, myConnections]);
-
-  // asking, and answering a request they sent you, both change where you stand
-  // with them, which is the whole shape of this page: refetching redraws it
-  // rather than trying to patch each piece that moved
-  // the card hands back whoever it is showing, which is this person on their
-  // own page and somebody out of their list in the column beside it
+  // the connection work itself belongs to the shared list, and these only add
+  // what is true of this page and no other: where you stand with the person
+  // whose page this is decides how much of them the server will show, so their
+  // record is asked for again once the answer has landed. the cards hand back
+  // whoever they are showing, which is this person on their own page and
+  // somebody out of their list in the column beside it
   const handleConnect = useCallback(
     async (person) => {
-      try {
-        await api.post("/connections", { recipient: person._id });
-        await refresh();
-      } catch (requestError) {
-        setError(readError(requestError));
-      }
+      await connect(person);
+      await refresh();
     },
-    [refresh],
+    [connect, refresh],
   );
 
   const handleAccept = useCallback(
-    async (_person, accepted) => {
-      try {
-        await api.post(`/connections/${accepted._id}/accept`);
-        await refresh();
-      } catch (requestError) {
-        setError(readError(requestError));
-      }
+    async (person, asked) => {
+      await accept(person, asked);
+      await refresh();
     },
-    [refresh],
+    [accept, refresh],
   );
 
   const handleReject = useCallback(
-    async (_person, rejected) => {
-      try {
-        await api.post(`/connections/${rejected._id}/reject`);
-        await refresh();
-      } catch (requestError) {
-        setError(readError(requestError));
-      }
+    async (person, asked) => {
+      await reject(person, asked);
+      await refresh();
     },
-    [refresh],
+    [reject, refresh],
   );
 
   // the same footer whether or not you are connected, so the two versions of
@@ -217,7 +189,11 @@ function PersonProfile() {
 
   return (
     <Container className="mt-5">
-      {error && <Alert variant="danger">{error}</Alert>}
+      {/* their record and the connection work fail separately, but there is
+          only ever one thing to say about the page at a time */}
+      {(error || connectionError) && (
+        <Alert variant="danger">{error ?? connectionError}</Alert>
+      )}
       {isConnected ? (
         <Row>
           {/* two halves rather than the three thirds of your own page: who they
@@ -252,7 +228,7 @@ function PersonProfile() {
                       // what you may do about it, stays yours and not theirs
                       currentUserId={currentUser?._id}
                       isAdmin={currentUser?.isAdmin}
-                      connection={myConnectionByUserId.get(person._id)}
+                      connection={byUserId.get(person._id)}
                       onEdit={refresh}
                       onDelete={refresh}
                       onConnect={handleConnect}
@@ -276,10 +252,10 @@ function PersonProfile() {
           </Col>
         </Row>
       )}
-      {/* under the profile either way: what they can do, and what the people
-          they are connected to can do. a stranger's network is not on show, so
-          that half is simply absent until you are connected */}
-      <SkillsPanel user={user} connections={connections} onChanged={refresh} />
+      {/* under the profile either way, connected or not: where they have sat
+          and what they can do are as public as the biography above them */}
+      <RolesPanel user={user} onChanged={refresh} />
+      <SkillsPanel user={user} onChanged={refresh} />
     </Container>
   );
 }

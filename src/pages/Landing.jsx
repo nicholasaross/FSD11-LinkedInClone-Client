@@ -3,9 +3,9 @@ import { Alert, Col, Container, Row } from "react-bootstrap";
 import AddNewUser from "../components/AddNewUser";
 import User from "../components/User";
 import { useAuth } from "../context/AuthContext";
+import { useConnections } from "../context/ConnectionsContext";
 import api from "../api/axios";
 import { DEFAULT_AVATAR } from "../utils/avatar";
-import { otherEnd } from "../utils/connections";
 
 // swap in the local default when a stored imageUrl fails to load; the guard
 // stops an endless loop if the default itself is missing
@@ -16,19 +16,20 @@ const handleImageError = (event, user) => {
   }
 };
 
-// the message the server sent, or the fallback every page here uses when the
-// request never landed
-const readError = (requestError) =>
-  requestError.response?.data?.message ??
-  "Could not reach the server. Is it running?";
-
 function Landing() {
   const { currentUser } = useAuth();
+  // the list, the map filed by person, and the three answers, all from the one
+  // place that keeps them: this page reads the same records the profile pages
+  // do, so answering a request here is answered there too
+  const {
+    byUserId,
+    error,
+    refresh: refreshConnections,
+    connect,
+    accept,
+    reject,
+  } = useConnections();
   const [users, setUsers] = useState([]);
-  const [connections, setConnections] = useState([]);
-  // connection work is something the user asked for, so unlike the two fetches
-  // its failures belong on the page rather than in the console
-  const [error, setError] = useState(null);
 
   // the route only mounts this page when a token exists, so there is no
   // signed-out case to guard here
@@ -42,41 +43,19 @@ function Landing() {
     }
   }, []);
 
-  // every connection the signed-in user is part of, pending and accepted, both
-  // ends populated. there is no per-user endpoint, so one list covers the page
-  const fetchConnections = useCallback(async () => {
-    try {
-      const response = await api.get("/connections");
-      setConnections(response.data.data ?? []);
-    } catch (error) {
-      console.error("Error fetching connections:", error);
-    }
-  }, []);
-
-  const refresh = useCallback(async () => {
-    await Promise.all([fetchUsers(), fetchConnections()]);
-  }, [fetchConnections, fetchUsers]);
-
   // the await keeps setState out of the effect body, which the
   // react-hooks/set-state-in-effect rule flags as a cascading render
   useEffect(() => {
     (async () => {
-      await refresh();
+      await fetchUsers();
     })();
-  }, [refresh]);
+  }, [fetchUsers]);
 
-  // a connection names both people, so it is filed under whichever of them
-  // isn't the signed-in user; that is the card it belongs to
-  const connectionsByUserId = useMemo(() => {
-    const map = new Map();
-    for (const connection of connections) {
-      const otherId = otherEnd(connection, currentUser?._id)?._id;
-      if (otherId) {
-        map.set(otherId, connection);
-      }
-    }
-    return map;
-  }, [connections, currentUser?._id]);
+  // a deleted account takes its connections with it, so both lists are asked
+  // for again
+  const refresh = useCallback(async () => {
+    await Promise.all([fetchUsers(), refreshConnections()]);
+  }, [fetchUsers, refreshConnections]);
 
   // your own card lives on the profile page, which is also where its Edit
   // button went, so this page is only other people
@@ -92,53 +71,10 @@ function Landing() {
   const visibleUsers = useMemo(
     () =>
       otherUsers.filter(
-        (user) => connectionsByUserId.get(user._id)?.status !== "accepted",
+        (user) => byUserId.get(user._id)?.status !== "accepted",
       ),
-    [connectionsByUserId, otherUsers],
+    [byUserId, otherUsers],
   );
-
-  // the reply is the new connection with both ends populated, already the
-  // shape the cards read, so it goes straight in rather than costing a refetch
-  const handleConnect = useCallback(async (user) => {
-    try {
-      const response = await api.post("/connections", { recipient: user._id });
-      setConnections((previous) => [response.data.data, ...previous]);
-      setError(null);
-    } catch (requestError) {
-      // a 409 means a record appeared since the page loaded, in either
-      // direction; the message from the server says which
-      setError(readError(requestError));
-    }
-  }, []);
-
-  // accepting hands back the whole updated connection, so it replaces just
-  // that record and the card's badge follows
-  const handleAccept = useCallback(async (user, connection) => {
-    try {
-      const response = await api.post(`/connections/${connection._id}/accept`);
-      const updated = response.data.data;
-      setConnections((previous) =>
-        previous.map((item) => (item._id === updated._id ? updated : item)),
-      );
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
-
-  // rejecting deletes the record rather than marking it, so the card goes back
-  // to "not connected" and they are free to ask again
-  const handleReject = useCallback(async (user, connection) => {
-    try {
-      await api.post(`/connections/${connection._id}/reject`);
-      setConnections((previous) =>
-        previous.filter((item) => item._id !== connection._id),
-      );
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
 
   return (
     <Container className="mt-5 text-center">
@@ -152,13 +88,12 @@ function Landing() {
                 user={user}
                 currentUserId={currentUser?._id}
                 isAdmin={currentUser?.isAdmin}
-                connection={connectionsByUserId.get(user._id)}
+                connection={byUserId.get(user._id)}
                 onEdit={fetchUsers}
-                // a deleted account takes its connections with it
                 onDelete={refresh}
-                onConnect={handleConnect}
-                onAccept={handleAccept}
-                onReject={handleReject}
+                onConnect={connect}
+                onAccept={accept}
+                onReject={reject}
                 onImageError={handleImageError}
               />
             </Col>

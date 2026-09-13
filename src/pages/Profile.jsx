@@ -5,9 +5,11 @@ import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import EditUser from "../components/EditUser";
 import ProfileSummary from "../components/ProfileSummary";
+import RolesPanel from "../components/RolesPanel";
 import SkillsPanel from "../components/SkillsPanel";
 import User from "../components/User";
 import { useAuth } from "../context/AuthContext";
+import { useConnections } from "../context/ConnectionsContext";
 import api from "../api/axios";
 import { handleAvatarError } from "../utils/avatar";
 import { otherEnd } from "../utils/connections";
@@ -20,16 +22,22 @@ const readError = (requestError) =>
 
 function Profile() {
   const { currentUser } = useAuth();
+  // the two columns on the right are cuts of the one shared list: the requests
+  // waiting on an answer from you, and the ones already answered. the answers
+  // themselves come from the same place, so a request accepted here leaves the
+  // top column and joins the one below it without either being refetched
+  const {
+    accepted,
+    incomingRequests,
+    error: connectionError,
+    refresh: refreshConnections,
+    accept,
+    reject,
+  } = useConnections();
   // seeded from the session so the card draws straight away; /users/me then
   // replaces it with the server's copy, which is what an edit made elsewhere
   // (or by an admin) would have changed
   const [user, setUser] = useState(currentUser);
-  // only the requests waiting on an answer from this user, which is what the
-  // server's status and direction filters narrow to
-  const [requests, setRequests] = useState([]);
-  // the accepted ones, in both directions: who asked whom stops mattering once
-  // the request has been answered
-  const [connections, setConnections] = useState([]);
   const [error, setError] = useState(null);
 
   const fetchMe = useCallback(async () => {
@@ -44,106 +52,27 @@ function Profile() {
     }
   }, []);
 
-  const fetchRequests = useCallback(async () => {
-    try {
-      // incoming means sent to you, which is the only kind you can answer
-      const response = await api.get("/connections", {
-        params: { status: "pending", direction: "incoming" },
-      });
-      setRequests(response.data.data ?? []);
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
-
-  const fetchConnections = useCallback(async () => {
-    try {
-      const response = await api.get("/connections", {
-        params: { status: "accepted" },
-      });
-      setConnections(response.data.data ?? []);
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
-
-  const refresh = useCallback(async () => {
-    await Promise.all([fetchMe(), fetchRequests(), fetchConnections()]);
-  }, [fetchConnections, fetchMe, fetchRequests]);
-
   // the await keeps setState out of the effect body, which the
   // react-hooks/set-state-in-effect rule flags as a cascading render
   useEffect(() => {
     (async () => {
-      await refresh();
+      await fetchMe();
     })();
-  }, [refresh]);
-
-  // answered either way, the request is no longer pending, so it leaves the
-  // column: accepting turns it into a connection the landing page shows, and
-  // rejecting deletes it outright
-  const handleAccept = useCallback(async (requester, connection) => {
-    try {
-      const response = await api.post(`/connections/${connection._id}/accept`);
-      setRequests((previous) =>
-        previous.filter((item) => item._id !== connection._id),
-      );
-      // the reply is the accepted connection with both ends populated, so it
-      // crosses straight into the connections column rather than costing a
-      // refetch
-      setConnections((previous) => [response.data.data, ...previous]);
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
-
-  const handleReject = useCallback(async (requester, connection) => {
-    try {
-      await api.post(`/connections/${connection._id}/reject`);
-      setRequests((previous) =>
-        previous.filter((item) => item._id !== connection._id),
-      );
-      setError(null);
-    } catch (requestError) {
-      setError(readError(requestError));
-    }
-  }, []);
+  }, [fetchMe]);
 
   return (
     <Container className="mt-5">
-      {error && <Alert variant="danger">{error}</Alert>}
+      {/* your own record and the connection work fail separately, but there is
+          only ever one thing to say about the page at a time */}
+      {(error || connectionError) && (
+        <Alert variant="danger">{error ?? connectionError}</Alert>
+      )}
       <Row>
-        {/* three thirds, with you in the middle: who you are connected to,
-            who you are, and who is still waiting on an answer */}
-        <Col md={4}>
-          <h2 className="h5 mb-3">Connections</h2>
-          {connections.length === 0 ? (
-            <p className="text-muted">No connections yet.</p>
-          ) : (
-            <div className="text-center">
-              {connections.map((connection) => (
-                <User
-                  key={connection._id}
-                  // either end of the pair can be the one who asked, so the
-                  // card shows whichever of the two isn't you
-                  user={otherEnd(connection, user?._id)}
-                  currentUserId={user?._id}
-                  isAdmin={user?.isAdmin}
-                  connection={connection}
-                  onEdit={fetchConnections}
-                  onDelete={fetchConnections}
-                  onImageError={handleAvatarError}
-                />
-              ))}
-            </div>
-          )}
-        </Col>
-        <Col md={4}>
-          {/* the same summary a connection's page shows of them, read about
-              yourself: your own address is always yours to see */}
+        {/* the two halves a connection's page has, read about yourself: who
+            you are on the left, and everybody else on the right */}
+        <Col md={6}>
+          {/* the same summary a connection's page shows of them: your own
+              address is always yours to see */}
           {user && (
             <ProfileSummary
               user={user}
@@ -152,28 +81,53 @@ function Profile() {
             />
           )}
         </Col>
-        <Col md={4}>
-          {/* the last column sits against the right edge of the page, so its
-              heading reads from there rather than floating in from the left */}
+        <Col md={6}>
+          {/* the people still waiting on an answer come first: a request is
+              something to do, where a connection is only something to read.
+              both columns sit against the right edge of the page, so their
+              headings read from there rather than floating in from the left */}
           <h2 className="h5 mb-3 text-end">Connection Requests</h2>
-          {requests.length === 0 ? (
+          {incomingRequests.length === 0 ? (
             <p className="text-muted">No pending requests.</p>
           ) : (
-            // the landing page's cards, centred the way that page centres
-            // them, so a request carries the same picture, details and Feed
-            // button as any other person on the site
-            <div className="text-center">
-              {requests.map((request) => (
+            // the row-shaped cards a connection's page lists people with, since
+            // this column is now a list of faces and names rather than a third
+            // of the page given over to one card each
+            <div className="mb-4">
+              {incomingRequests.map((request) => (
                 <User
                   key={request._id}
+                  compact
                   user={request.requester}
                   currentUserId={user?._id}
                   isAdmin={user?.isAdmin}
                   connection={request}
-                  onEdit={fetchRequests}
-                  onDelete={fetchRequests}
-                  onAccept={handleAccept}
-                  onReject={handleReject}
+                  onEdit={refreshConnections}
+                  onDelete={refreshConnections}
+                  onAccept={accept}
+                  onReject={reject}
+                  onImageError={handleAvatarError}
+                />
+              ))}
+            </div>
+          )}
+          <h2 className="h5 mb-3 text-end">Connections</h2>
+          {accepted.length === 0 ? (
+            <p className="text-muted">No connections yet.</p>
+          ) : (
+            <div>
+              {accepted.map((connection) => (
+                <User
+                  key={connection._id}
+                  compact
+                  // either end of the pair can be the one who asked, so the
+                  // card shows whichever of the two isn't you
+                  user={otherEnd(connection, user?._id)}
+                  currentUserId={user?._id}
+                  isAdmin={user?.isAdmin}
+                  connection={connection}
+                  onEdit={refreshConnections}
+                  onDelete={refreshConnections}
                   onImageError={handleAvatarError}
                 />
               ))}
@@ -181,10 +135,14 @@ function Profile() {
           )}
         </Col>
       </Row>
-      {/* what you can do, and what the people you are connected to can do,
-          under the profile the three columns above are about */}
+      {/* where you have sat and what you can do, under the profile the two
+          columns above are about. both ride along on your own record, so both
+          are changed by asking for that record again */}
       {user && (
-        <SkillsPanel user={user} connections={connections} onChanged={refresh} />
+        <>
+          <RolesPanel user={user} onChanged={fetchMe} />
+          <SkillsPanel user={user} onChanged={fetchMe} />
+        </>
       )}
     </Container>
   );

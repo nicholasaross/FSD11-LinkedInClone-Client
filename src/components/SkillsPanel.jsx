@@ -1,14 +1,11 @@
 import { useState } from "react";
 import Alert from "react-bootstrap/Alert";
 import Card from "react-bootstrap/Card";
-import { Link } from "react-router";
 import AddSkill from "./AddSkill";
 import CreateSkill from "./CreateSkill";
 import SkillBadge from "./SkillBadge";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
-import { avatarSrc, handleAvatarError } from "../utils/avatar";
-import { otherEnd } from "../utils/connections";
 import { categoryLabel, groupByCategory } from "../utils/skills";
 
 // a portfolio laid out by category, which is the order the server sorts it in
@@ -43,10 +40,10 @@ function Portfolio({ skills, onRemove, removing }) {
   );
 }
 
-// the region under the profile itself: what this person can do, and what the
-// people they are connected to can do. a network is listed one person at a time
-// rather than pooled, so a skill stays attached to whoever actually has it
-function SkillsPanel({ user, connections = [], onChanged }) {
+// the region under the profile itself: what this person can do. the people
+// they are connected to carry their own skills on their own pages, which is
+// where a skill stays attached to whoever actually has it
+function SkillsPanel({ user, onChanged }) {
   const { currentUser } = useAuth();
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -116,58 +113,6 @@ function SkillsPanel({ user, connections = [], onChanged }) {
           onRemove={canEdit ? handleRemove : undefined}
           removing={removing}
         />
-
-        {connections.length > 0 && (
-          <>
-            <hr className="my-4" />
-            <h3 className="h6 mb-3">
-              {isSelf
-                ? "Skills in your network"
-                : `Skills in ${user.name}'s network`}
-            </h3>
-            <div className="d-flex flex-column gap-3">
-              {connections.map((connection) => {
-                // whichever end of the pair isn't the person whose page this is
-                const person = otherEnd(connection, user._id);
-                if (!person) {
-                  return null;
-                }
-
-                return (
-                  <div key={connection._id}>
-                    <Link
-                      to={
-                        person._id === currentUser?._id
-                          ? "/profile"
-                          : `/profile/${person._id}`
-                      }
-                      className="d-inline-flex align-items-center gap-2 text-reset text-decoration-none mb-2"
-                    >
-                      <img
-                        className="author-avatar"
-                        src={avatarSrc(person.imageUrl)}
-                        alt=""
-                        onError={handleAvatarError}
-                      />
-                      <span className="fw-semibold">{person.name}</span>
-                    </Link>
-                    <div className="d-flex flex-wrap gap-2">
-                      {person.skills?.length ? (
-                        person.skills.map((skill) => (
-                          <SkillBadge key={skill._id} skill={skill} />
-                        ))
-                      ) : (
-                        <span className="text-muted small">
-                          No skills listed.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
       </Card.Body>
     </Card>
   );
